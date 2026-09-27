@@ -120,7 +120,123 @@ def get_demo_image(sign_name, size=(136, 136), radius=10):
 # ---------------------------------------------------------------------------
 # Lesson Curriculum: Clear, Simple Steps
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Lesson Curriculum: Clear, Simple Steps
+# ---------------------------------------------------------------------------
 SIGN_METADATA = {
+    # --- Numbers (Static Hand Poses) ---
+    "1": {
+        "title": "NUMBER 1",
+        "category": "ASL NUMBERS • LEVEL 1",
+        "steps": [
+            "1. Point INDEX finger straight UP",
+            "2. Fold middle, ring & pinky into palm",
+            "3. Hold steady toward camera"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: 1 (INDEX UP)"
+    },
+    "2": {
+        "title": "NUMBER 2",
+        "category": "ASL NUMBERS • LEVEL 1",
+        "steps": [
+            "1. Raise INDEX & MIDDLE fingers upright",
+            "2. Form a distinct 'V' shape",
+            "3. Keep ring & pinky folded down"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: 2 (INDEX + MIDDLE)"
+    },
+    "3": {
+        "title": "NUMBER 3",
+        "category": "ASL NUMBERS • LEVEL 1",
+        "steps": [
+            "1. Extend THUMB, INDEX & MIDDLE fingers",
+            "2. Keep ring and pinky fingers folded",
+            "3. Hold upright facing the camera"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: 3 (THUMB + 2 FINGERS)"
+    },
+    "4": {
+        "title": "NUMBER 4",
+        "category": "ASL NUMBERS • LEVEL 1",
+        "steps": [
+            "1. Hold all 4 fingers straight UP",
+            "2. Tuck thumb across your palm",
+            "3. Keep fingers upright together"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: 4 (4 FINGERS UP)"
+    },
+    "5": {
+        "title": "NUMBER 5",
+        "category": "ASL NUMBERS • LEVEL 1",
+        "steps": [
+            "1. Open entire hand facing camera",
+            "2. Spread all 5 fingers evenly",
+            "3. Hold steady in camera view"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: 5 (ALL 5 OPEN)"
+    },
+
+    # --- Letters (Static Hand Poses) ---
+    "A": {
+        "title": "LETTER 'A'",
+        "category": "ASL ALPHABET • BASICS",
+        "steps": [
+            "1. Make a tight fist with 4 fingers",
+            "2. Rest thumb upright alongside index",
+            "3. Palm facing outward to camera"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: LETTER 'A'"
+    },
+    "B": {
+        "title": "LETTER 'B'",
+        "category": "ASL ALPHABET • BASICS",
+        "steps": [
+            "1. Hold 4 fingers straight UP together",
+            "2. Fold thumb flat across your palm",
+            "3. Keep palm upright toward camera"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: LETTER 'B'"
+    },
+    "C": {
+        "title": "LETTER 'C'",
+        "category": "ASL ALPHABET • BASICS",
+        "steps": [
+            "1. Curve all 4 fingers in an arch",
+            "2. Curve thumb to face fingers",
+            "3. Form an open 'C' shape"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: LETTER 'C'"
+    },
+    "V": {
+        "title": "LETTER 'V'",
+        "category": "ASL ALPHABET • BASICS",
+        "steps": [
+            "1. Raise INDEX & MIDDLE fingers in 'V'",
+            "2. Keep ring and pinky fingers folded",
+            "3. Palm facing forward"
+        ],
+        "target_region": "hand_pose",
+        "target_landmark_id": None,
+        "target_label": "STATIC POSE: LETTER 'V'"
+    },
+
+    # --- Dynamic Word Signs ---
     "FATHER": {
         "title": "FATHER",
         "category": "FAMILY SIGN • ASL",
@@ -328,7 +444,7 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     # Camera Bottom Info Strip
     draw.rounded_rectangle([cam_x, cam_y + cam_h + 16, cam_x + cam_w, cam_y + cam_h + 84],
                            radius=10, fill=COLOR_CARD_BG, outline=COLOR_CARD_BORDER, width=1)
-    controls_txt = "[N] Next Sign  |  [D] Enlarge Demo Photo  |  [M] Mode Toggle  |  [R] Reset  |  [Q] Quit"
+    controls_txt = "[N] Next Sign  |  [C] Switch Category  |  [D] Enlarge Demo  |  [M] Mode  |  [Q] Quit"
     draw.text((cam_x + 20, cam_y + cam_h + 38), controls_txt,
               font=FONTS.bold_font, fill=COLOR_TEXT_SECONDARY)
 
@@ -348,11 +464,12 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
 
     # Mode Indicator Pill
     is_tutor_mode = (state["mode"] == "tutor")
-    mode_label = "TUTOR MODE" if is_tutor_mode else "FREE PRACTICE MODE"
+    category_name = state.get("current_category", "ALL")
+    mode_label = f"TUTOR: {category_name}" if is_tutor_mode else "FREE PRACTICE"
     mode_color = COLOR_EMERALD if is_tutor_mode else COLOR_PURPLE
-    draw.rounded_rectangle([dash_x + dash_w - 170, 26, dash_x + dash_w, 54],
+    draw.rounded_rectangle([dash_x + dash_w - 180, 26, dash_x + dash_w, 54],
                            radius=6, fill=COLOR_CARD_BG, outline=mode_color, width=1)
-    draw.text((dash_x + dash_w - 155, 32), mode_label, font=FONTS.small_font, fill=mode_color)
+    draw.text((dash_x + dash_w - 168, 32), mode_label, font=FONTS.small_font, fill=mode_color)
 
     # -----------------------------------------------------------------------
     # Card 1: Current Lesson Card with Visual Reference Demo Photo
@@ -416,13 +533,17 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
         coach_badge = "EXCELLENT!"
         coach_msg = "Gesture recognized! Great job! +100 Points Awarded."
         coach_theme = COLOR_EMERALD
-    elif not has_face:
-        coach_badge = "LOOKING FOR FACE"
-        coach_msg = "Please position your face clearly in the camera view."
-        coach_theme = COLOR_AMBER
     elif not has_hand:
         coach_badge = "LOOKING FOR HAND"
         coach_msg = "Raise your hand in front of the camera to begin signing."
+        coach_theme = COLOR_AMBER
+    elif state.get("feedback_msg"):
+        coach_badge = "AI GUIDANCE"
+        coach_msg = state["feedback_msg"]
+        coach_theme = COLOR_CYAN if "Hold" not in coach_msg else COLOR_EMERALD
+    elif not has_face and meta.get("target_region") in ("forehead", "chin"):
+        coach_badge = "LOOKING FOR FACE"
+        coach_msg = "Please position your face clearly in the camera view."
         coach_theme = COLOR_AMBER
     elif in_pos:
         coach_badge = "GREAT POSITION"
@@ -438,7 +559,7 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
         coach_theme = COLOR_CYAN
     else:
         coach_badge = "ACTION REQUIRED"
-        coach_msg = "Snap index and middle fingers firmly onto your thumb."
+        coach_msg = "Follow the steps and match the demo photo."
         coach_theme = COLOR_CYAN
 
     draw.rounded_rectangle([dash_x, card2_y, dash_x + dash_w, card2_y + card2_h],

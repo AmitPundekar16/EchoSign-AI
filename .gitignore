@@ -18,3 +18,7 @@ Thumbs.db
 
 # Large temporary models or checkpoints if needed
 # (Note: we keep models/sign_language_model.h5 and mp_models/*.task since they are small enough for GitHub)
+
+# Temporary scratch tests
+scratch/
+
