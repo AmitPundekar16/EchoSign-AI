@@ -156,6 +156,30 @@ SIGN_METADATA = {
         "target_region": "hand_snap",
         "target_landmark_id": None,
         "target_label": "MOTION: PINCH TO THUMB"
+    },
+    "HELLO": {
+        "title": "HELLO",
+        "category": "GREETING • ASL",
+        "steps": [
+            "1. Open flat hand, fingers together",
+            "2. Place hand near your TEMPLE / FOREHEAD",
+            "3. Move hand slightly outward in a salute wave"
+        ],
+        "target_region": "forehead",
+        "target_landmark_id": 10,
+        "target_label": "TARGET: TEMPLE / FOREHEAD"
+    },
+    "THANK_YOU": {
+        "title": "THANK YOU",
+        "category": "COURTESY • ASL",
+        "steps": [
+            "1. Flat open hand, palm facing in",
+            "2. Touch fingertips to your CHIN / LIPS",
+            "3. Move hand outward toward the camera"
+        ],
+        "target_region": "chin",
+        "target_landmark_id": 152,
+        "target_label": "TARGET: CHIN ➔ OUTWARD"
     }
 }
 

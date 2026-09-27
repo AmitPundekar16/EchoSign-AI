@@ -1,6 +1,6 @@
 {
   "model_type": "lstm",
-  "model_path": "models/sign_language_model.h5",
+  "model_path": "C:\\Users\\Amit\\OneDrive\\Desktop\\programing\\Git\\EchoSign AI\\models\\sign_language_model.h5",
   "sequence_len": 60,
   "feature_length": 220,
   "feature_names": [
@@ -228,20 +228,26 @@
   "classes": [
     "Father::FATHER",
     "Father::NOT_FATHER",
+    "Hello::HELLO",
+    "Hello::NOT_HELLO",
     "Mother::MOTHER",
     "Mother::NOT_MOTHER",
     "No::NO",
-    "No::NOT_NO"
+    "No::NOT_NO",
+    "Thank You::NOT_THANK_YOU",
+    "Thank You::THANK_YOU"
   ],
   "languages": [
     "Father",
+    "Hello",
     "Mother",
-    "No"
+    "No",
+    "Thank You"
   ],
   "class_separator": "::",
-  "num_train_sequences": 63,
-  "num_val_sequences": 14,
-  "num_test_sequences": 14,
-  "validation_accuracy": 0.7857142686843872,
-  "test_accuracy": 0.9285714285714286
+  "num_train_sequences": 105,
+  "num_val_sequences": 23,
+  "num_test_sequences": 23,
+  "validation_accuracy": 0.43478259444236755,
+  "test_accuracy": 0.5217391304347826
 }
