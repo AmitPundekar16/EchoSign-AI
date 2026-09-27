@@ -6,6 +6,8 @@ Modern, high-resolution visual rendering engine for EchoSign AI.
 Features:
 - Dual-pane Studio Canvas (1280x720): Widescreen live webcam on the left,
   interactive AI tutor coach dashboard on the right.
+- Interactive Click-to-Enlarge Demo Modal: Clicking the demo photo (or pressing D / Space)
+  brings up a huge 450x450 crystal-clear demonstration view with a dark focus veil.
 - Real-time Spatial Target Guidance: Highlights facial target zones (Forehead, Chin)
   with dynamic pulsing crosshairs and distance tracking (NO mesh mask on face).
 - Visual Reference Demo Photos: Embeds high-resolution demo gesture cards for each sign.
@@ -65,6 +67,7 @@ class FontManager:
             self.small_font = ImageFont.truetype(reg_path, 13)
             self.large_sign_font = ImageFont.truetype(bold_path, 34)
             self.stat_font = ImageFont.truetype(bold_path, 22)
+            self.modal_title_font = ImageFont.truetype(bold_path, 24)
         except Exception:
             self.title_font = ImageFont.load_default()
             self.header_font = ImageFont.load_default()
@@ -73,6 +76,7 @@ class FontManager:
             self.small_font = ImageFont.load_default()
             self.large_sign_font = ImageFont.load_default()
             self.stat_font = ImageFont.load_default()
+            self.modal_title_font = ImageFont.load_default()
 
 FONTS = FontManager()
 
@@ -83,9 +87,9 @@ ASSETS_DIR = os.path.join(config.PROJECT_ROOT, "assets")
 DEMO_IMAGE_CACHE = {}
 
 
-def get_demo_image(sign_name, size=(142, 142)):
+def get_demo_image(sign_name, size=(136, 136), radius=10):
     """Loads, resizes, and caches demo reference images with rounded corners."""
-    key = (sign_name.upper(), size)
+    key = (sign_name.upper(), size, radius)
     if key in DEMO_IMAGE_CACHE:
         return DEMO_IMAGE_CACHE[key]
 
@@ -102,7 +106,7 @@ def get_demo_image(sign_name, size=(142, 142)):
         # Apply rounded corner mask
         mask = Image.new("L", size, 0)
         mask_draw = ImageDraw.Draw(mask)
-        mask_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=10, fill=255)
+        mask_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=radius, fill=255)
 
         rounded = Image.new("RGBA", size, (0, 0, 0, 0))
         rounded.paste(resized, (0, 0), mask)
@@ -260,7 +264,8 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     """
     Builds the high-definition 1280x720 studio canvas.
     - Left: Clean, unmasked camera feed with target crosshair.
-    - Right: Tutor Coach instructions, live visual demo image, and real-time guidance.
+    - Right: Tutor Coach instructions, visual demo thumbnail, and real-time guidance.
+    - Modal: High-resolution enlarged demonstration view when clicked or 'D' is pressed.
     """
     CANVAS_W, CANVAS_H = 1280, 720
     canvas_img = Image.new("RGB", (CANVAS_W, CANVAS_H), COLOR_BG_DARK)
@@ -298,8 +303,8 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     # Camera Bottom Info Strip
     draw.rounded_rectangle([cam_x, cam_y + cam_h + 16, cam_x + cam_w, cam_y + cam_h + 84],
                            radius=10, fill=COLOR_CARD_BG, outline=COLOR_CARD_BORDER, width=1)
-    controls_txt = "[N] Next Lesson    |    [M] Mode Toggle    |    [R] Reset Score    |    [Q] Quit"
-    draw.text((cam_x + 24, cam_y + cam_h + 40), controls_txt,
+    controls_txt = "[N] Next Sign  |  [D] Enlarge Demo Photo  |  [M] Mode Toggle  |  [R] Reset  |  [Q] Quit"
+    draw.text((cam_x + 20, cam_y + cam_h + 38), controls_txt,
               font=FONTS.bold_font, fill=COLOR_TEXT_SECONDARY)
 
     # -----------------------------------------------------------------------
@@ -349,21 +354,27 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
               font=FONTS.small_font, fill=COLOR_EMERALD)
 
     # Demo Reference Photo (Right column inside Card 1)
-    demo_img = get_demo_image(cur_target, size=(142, 142))
-    img_x = dash_x + dash_w - 142 - 16
-    img_y = card1_y + 44
+    thumb_size = 136
+    demo_img = get_demo_image(cur_target, size=(thumb_size, thumb_size), radius=10)
+    img_x = dash_x + dash_w - thumb_size - 16
+    img_y = card1_y + 40
 
-    draw.text((img_x, card1_y + 20), "DEMO EXAMPLE:", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
+    draw.text((img_x, card1_y + 18), "DEMO EXAMPLE:", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
 
     if demo_img is not None:
         canvas_img.paste(demo_img, (img_x, img_y), demo_img)
-        draw.rounded_rectangle([img_x - 1, img_y - 1, img_x + 143, img_y + 143],
+        draw.rounded_rectangle([img_x - 1, img_y - 1, img_x + thumb_size + 1, img_y + thumb_size + 1],
                                radius=10, outline=COLOR_CYAN, width=2)
     else:
-        # Fallback card if image not found
-        draw.rounded_rectangle([img_x, img_y, img_x + 142, img_y + 142],
+        draw.rounded_rectangle([img_x, img_y, img_x + thumb_size, img_y + thumb_size],
                                radius=10, fill=(30, 36, 48), outline=COLOR_CARD_BORDER, width=1)
-        draw.text((img_x + 20, img_y + 60), "See Guide", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
+        draw.text((img_x + 15, img_y + 55), "See Guide", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
+
+    # Click to Enlarge Badge directly below thumbnail
+    badge_y = img_y + thumb_size + 8
+    draw.rounded_rectangle([img_x, badge_y, img_x + thumb_size, badge_y + 24],
+                           radius=6, fill=(25, 38, 52), outline=COLOR_CYAN, width=1)
+    draw.text((img_x + 14, badge_y + 4), "🔍 Click to Enlarge", font=FONTS.small_font, fill=COLOR_CYAN)
 
     # -----------------------------------------------------------------------
     # Card 2: Live AI Coach Guidance (Dynamic Real-time Advice)
@@ -466,6 +477,53 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
                   font=FONTS.header_font, fill=(255, 255, 255))
         draw.text((bx1 + banner_w // 2 - 90, by1 + 54), "+100 Points Awarded",
                   font=FONTS.bold_font, fill=COLOR_EMERALD)
+
+    # -----------------------------------------------------------------------
+    # 4. Large Enlarged Modal Overlay (When user clicks on image or presses D)
+    # -----------------------------------------------------------------------
+    if state.get("show_enlarged_demo", False):
+        # Semi-transparent dark focus veil over entire canvas
+        veil = Image.new("RGBA", (CANVAS_W, CANVAS_H), (10, 14, 20, 220))
+        canvas_img.paste(veil, (0, 0), veil)
+
+        modal_w = 560
+        modal_h = 620
+        mx1 = (CANVAS_W - modal_w) // 2
+        my1 = (CANVAS_H - modal_h) // 2
+        mx2 = mx1 + modal_w
+        my2 = my1 + modal_h
+
+        # Modal Card Frame
+        draw.rounded_rectangle([mx1, my1, mx2, my2], radius=16, fill=(20, 26, 36),
+                               outline=COLOR_CYAN, width=3)
+
+        # Modal Header
+        draw.text((mx1 + 24, my1 + 20), f"DEMONSTRATION: {cur_target}",
+                  font=FONTS.modal_title_font, fill=COLOR_TEXT_PRIMARY)
+        draw.text((mx1 + 24, my1 + 50), meta["category"],
+                  font=FONTS.small_font, fill=COLOR_CYAN)
+
+        # Close Pill Button (Top Right of Modal)
+        draw.rounded_rectangle([mx2 - 165, my1 + 20, mx2 - 24, my1 + 48],
+                               radius=6, fill=(40, 25, 32), outline=COLOR_CORAL, width=1)
+        draw.text((mx2 - 152, my1 + 25), "✕ Click to Close", font=FONTS.small_font, fill=(255, 120, 120))
+
+        # Large 450x450 High-Definition Image
+        big_demo = get_demo_image(cur_target, size=(450, 450), radius=12)
+        big_x = mx1 + (modal_w - 450) // 2
+        big_y = my1 + 78
+
+        if big_demo is not None:
+            canvas_img.paste(big_demo, (big_x, big_y), big_demo)
+            draw.rounded_rectangle([big_x - 1, big_y - 1, big_x + 451, big_y + 451],
+                                   radius=12, outline=COLOR_CARD_BORDER, width=2)
+
+        # Bottom Instructions banner inside modal
+        cap_y = big_y + 462
+        step_summary = "   •   ".join(meta["steps"][:2])
+        draw.text((mx1 + 24, cap_y), step_summary, font=FONTS.regular_font, fill=COLOR_TEXT_PRIMARY)
+        draw.text((mx1 + 24, cap_y + 26), "Tip: Click anywhere or press [D] / [ESC] to return to camera view.",
+                  font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
 
     # Convert back to BGR for OpenCV
     final_canvas_bgr = np.array(canvas_img)[:, :, ::-1]

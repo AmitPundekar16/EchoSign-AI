@@ -135,6 +135,20 @@ def extract_positive_signs(label_encoder, separator="::"):
 
 
 
+def on_mouse_click(event, x, y, flags, param):
+    """Handles mouse click events to enlarge or dismiss demo reference photos."""
+    state = param
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if state.get("show_enlarged_demo", False):
+            # Click anywhere closes the enlarged preview
+            state["show_enlarged_demo"] = False
+        else:
+            # Check if clicked on the thumbnail box or "Click to Enlarge" badge
+            # (Thumbnail is at x: 1070..1260, y: 130..320)
+            if 1070 <= x <= 1260 and 130 <= y <= 320:
+                state["show_enlarged_demo"] = True
+
+
 def main():
     model, label_encoder, scaler, run_config = load_artifacts()
     sequence_len = run_config["sequence_len"]
@@ -174,8 +188,11 @@ def main():
         "step_start_time": time.time(),
         "last_pred_label": "",
         "last_pred_conf": 0.0,
-        "cooldown_until": 0.0
+        "cooldown_until": 0.0,
+        "show_enlarged_demo": False   # Click-to-enlarge modal state
     }
+
+    cv2.setMouseCallback(window_name, on_mouse_click, state)
 
     print("\n" + "=" * 60)
     print("  EchoSign AI - Interactive Sign Language Companion")
@@ -259,10 +276,18 @@ def main():
 
             if key == ord('q'):
                 break
+            elif key == ord('d') or key == ord(' '):  # Toggle enlarged demo preview
+                state['show_enlarged_demo'] = not state.get('show_enlarged_demo', False)
+            elif key == 27:  # ESC key
+                if state.get('show_enlarged_demo', False):
+                    state['show_enlarged_demo'] = False
+                else:
+                    break
             elif key == ord('n'):  # Skip / Next sign
                 state['target_idx'] = (state['target_idx'] + 1) % len(positive_signs)
                 state['current_target'] = positive_signs[state['target_idx']]
                 state['status'] = "active"
+                state['show_enlarged_demo'] = False
                 state['step_start_time'] = time.time()
                 frame_buffer.clear()
                 prediction_buffer.clear()
