@@ -101,7 +101,7 @@ FACE_REFERENCE_POINTS = [
 RECORDING_DURATION_SECONDS = 5.0
 TARGET_CAPTURE_FPS = 20          # frames we try to capture per second
 MAX_SEQUENCE_LEN = 100           # hard cap on frames kept per sequence
-MIN_SEQUENCE_LEN = 8             # sequences shorter than this are rejected
+MIN_SEQUENCE_LEN = 12            # minimum frames before starting sequence evaluation
 
 # Fixed sequence length the model is trained/tested on. Sequences are
 # padded (by repeating the last frame) or truncated (uniform sampling)
@@ -109,11 +109,11 @@ MIN_SEQUENCE_LEN = 8             # sequences shorter than this are rejected
 MODEL_SEQUENCE_LEN = 60
 
 # ---------------------------------------------------------------------------
-# Real-time smoothing
+# Real-time smoothing & responsive voting
 # ---------------------------------------------------------------------------
-PREDICTION_BUFFER_SIZE = 12
-MIN_CONFIDENCE_THRESHOLD = 0.65
-MIN_CONSECUTIVE_AGREEMENT = 7  # out of PREDICTION_BUFFER_SIZE
+PREDICTION_BUFFER_SIZE = 8       # compact voting buffer for responsive detection
+MIN_CONFIDENCE_THRESHOLD = 0.50  # balanced threshold (prevents false rejections)
+MIN_CONSECUTIVE_AGREEMENT = 4    # majority agreement needed (4 out of 8 frames)
 
 # ---------------------------------------------------------------------------
 # Misc

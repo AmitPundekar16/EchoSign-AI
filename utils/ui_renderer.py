@@ -305,6 +305,7 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     cam_display = raw_cam_frame.copy()
     cur_target = state["current_target"]
     thumb_pt, in_pos = draw_spatial_target_overlay(cam_display, detection, cur_target)
+    state["is_in_position"] = bool(in_pos)
 
     # Resize camera frame to viewport
     resized_cam = cv2.resize(cam_display, (cam_w, cam_h), interpolation=cv2.INTER_LINEAR)

@@ -244,11 +244,15 @@ def main():
             state['last_pred_label'] = pred_label
             state['last_pred_conf'] = pred_conf
 
-            # Tutor Logic Loop (Self-paced, NO timer pressure)
+            # Tutor Logic Loop (Self-paced, Hybrid AI + Spatial Verification)
             if state['mode'] == "tutor":
                 if state['status'] == "active":
                     # Check for correct sign execution
-                    if pred_label == state['current_target'] and pred_conf >= 0.70:
+                    is_in_target_zone = state.get("is_in_position", False)
+                    target_match = (pred_label == state['current_target'])
+
+                    # Success triggered by confident neural network match OR hybrid spatial confirmation
+                    if (target_match and pred_conf >= 0.45) or (is_in_target_zone and target_match and pred_conf >= 0.35) or (is_in_target_zone and pred_conf >= 0.55):
                         state['status'] = "success"
                         state['score'] += 100
                         state['streak'] += 1
