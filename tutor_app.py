@@ -170,9 +170,8 @@ def main():
         "target_idx": 0,
         "score": 0,
         "streak": 0,
-        "status": "active",          # 'active', 'success', 'timeout'
+        "status": "active",          # 'active', 'success'
         "step_start_time": time.time(),
-        "time_limit": 10.0,          # seconds per challenge
         "last_pred_label": "",
         "last_pred_conf": 0.0,
         "cooldown_until": 0.0
@@ -228,7 +227,7 @@ def main():
             state['last_pred_label'] = pred_label
             state['last_pred_conf'] = pred_conf
 
-            # Tutor Logic Loop
+            # Tutor Logic Loop (Self-paced, NO timer pressure)
             if state['mode'] == "tutor":
                 if state['status'] == "active":
                     # Check for correct sign execution
@@ -239,14 +238,7 @@ def main():
                         state['cooldown_until'] = now + 2.2
                         play_chime(success=True)
 
-                    # Check for timeout
-                    elif (now - state['step_start_time']) >= state['time_limit']:
-                        state['status'] = "timeout"
-                        state['streak'] = 0
-                        state['cooldown_until'] = now + 2.0
-                        play_chime(success=False)
-
-                elif state['status'] in ("success", "timeout"):
+                elif state['status'] == "success":
                     if now >= state['cooldown_until']:
                         # Advance to next lesson
                         state['target_idx'] = (state['target_idx'] + 1) % len(positive_signs)

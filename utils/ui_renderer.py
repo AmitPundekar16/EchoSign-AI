@@ -7,10 +7,12 @@ Features:
 - Dual-pane Studio Canvas (1280x720): Widescreen live webcam on the left,
   interactive AI tutor coach dashboard on the right.
 - Real-time Spatial Target Guidance: Highlights facial target zones (Forehead, Chin)
-  with dynamic pulsing crosshairs and distance tracking.
-- Step-by-step visual instruction cards with human-readable guidance.
+  with dynamic pulsing crosshairs and distance tracking (NO mesh mask on face).
+- Visual Reference Demo Photos: Embeds high-resolution demo gesture cards for each sign.
+- Self-paced Learning: Completely removed timer pressure so learners can practice
+  at their own comfortable pace.
 - Crisp anti-aliased TrueType typography via Pillow.
-- Rich gamification cards (Score, Streak, Live Confidence, Timer).
+- Rich gamification cards (Score, Streak, Live Confidence, Step Guides).
 """
 
 import math
@@ -33,7 +35,7 @@ COLOR_CARD_ACTIVE = (30, 41, 59)      # Slate Highlight
 COLOR_CYAN = (0, 210, 255)            # Primary Brand Accent
 COLOR_EMERALD = (46, 213, 115)        # Success / In Position
 COLOR_AMBER = (255, 177, 66)          # Caution / Searching
-COLOR_CORAL = (255, 71, 87)           # Timeout / Error
+COLOR_CORAL = (255, 71, 87)           # Error Alert
 COLOR_PURPLE = (165, 94, 234)         # Streak Multiplier
 
 COLOR_TEXT_PRIMARY = (240, 246, 252)  # High Contrast Text
@@ -50,7 +52,6 @@ class FontManager:
         bold_path = os.path.join(font_dir, "segoeuib.ttf")
         reg_path = os.path.join(font_dir, "segoeui.ttf")
 
-        # Fallbacks for non-Windows or if Segoe UI is missing
         if not os.path.exists(bold_path):
             bold_path = os.path.join(font_dir, "arialbd.ttf")
         if not os.path.exists(reg_path):
@@ -62,10 +63,9 @@ class FontManager:
             self.bold_font = ImageFont.truetype(bold_path, 16)
             self.regular_font = ImageFont.truetype(reg_path, 15)
             self.small_font = ImageFont.truetype(reg_path, 13)
-            self.large_sign_font = ImageFont.truetype(bold_path, 36)
+            self.large_sign_font = ImageFont.truetype(bold_path, 34)
             self.stat_font = ImageFont.truetype(bold_path, 22)
         except Exception:
-            # Safe standard fallback
             self.title_font = ImageFont.load_default()
             self.header_font = ImageFont.load_default()
             self.bold_font = ImageFont.load_default()
@@ -77,6 +77,43 @@ class FontManager:
 FONTS = FontManager()
 
 # ---------------------------------------------------------------------------
+# Demo Photo Caching Engine
+# ---------------------------------------------------------------------------
+ASSETS_DIR = os.path.join(config.PROJECT_ROOT, "assets")
+DEMO_IMAGE_CACHE = {}
+
+
+def get_demo_image(sign_name, size=(142, 142)):
+    """Loads, resizes, and caches demo reference images with rounded corners."""
+    key = (sign_name.upper(), size)
+    if key in DEMO_IMAGE_CACHE:
+        return DEMO_IMAGE_CACHE[key]
+
+    filename = f"demo_{sign_name.lower()}.jpg"
+    img_path = os.path.join(ASSETS_DIR, filename)
+
+    if not os.path.exists(img_path):
+        return None
+
+    try:
+        raw_img = Image.open(img_path).convert("RGB")
+        resized = raw_img.resize(size, Image.Resampling.LANCZOS)
+
+        # Apply rounded corner mask
+        mask = Image.new("L", size, 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=10, fill=255)
+
+        rounded = Image.new("RGBA", size, (0, 0, 0, 0))
+        rounded.paste(resized, (0, 0), mask)
+
+        DEMO_IMAGE_CACHE[key] = rounded
+        return rounded
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Lesson Curriculum: Clear, Simple Steps
 # ---------------------------------------------------------------------------
 SIGN_METADATA = {
@@ -84,33 +121,33 @@ SIGN_METADATA = {
         "title": "FATHER",
         "category": "FAMILY SIGN • ASL",
         "steps": [
-            "1. Open your dominant hand with 5 fingers spread out.",
-            "2. Touch the tip of your thumb to your FOREHEAD.",
-            "3. Keep fingers still and face the camera."
+            "1. Open hand (5 fingers spread)",
+            "2. Touch thumb to FOREHEAD",
+            "3. Hold steady for 1 second"
         ],
         "target_region": "forehead",
-        "target_landmark_id": 10,  # MediaPipe Forehead ID
+        "target_landmark_id": 10,
         "target_label": "TARGET: FOREHEAD"
     },
     "MOTHER": {
         "title": "MOTHER",
         "category": "FAMILY SIGN • ASL",
         "steps": [
-            "1. Open your dominant hand with 5 fingers spread out.",
-            "2. Touch the tip of your thumb to your CHIN.",
-            "3. Keep fingers still and face the camera."
+            "1. Open hand (5 fingers spread)",
+            "2. Touch thumb to CHIN",
+            "3. Hold steady for 1 second"
         ],
         "target_region": "chin",
-        "target_landmark_id": 152, # MediaPipe Chin ID
+        "target_landmark_id": 152,
         "target_label": "TARGET: CHIN"
     },
     "NO": {
         "title": "NO",
         "category": "DAILY ESSENTIALS • ASL",
         "steps": [
-            "1. Extend index and middle fingers together.",
-            "2. Snap/pinch them firmly down to meet your thumb.",
-            "3. Perform the closing motion in front of your chest."
+            "1. Extend index & middle finger",
+            "2. Snap firmly onto thumb",
+            "3. Hold steady for 1 second"
         ],
         "target_region": "hand_snap",
         "target_landmark_id": None,
@@ -128,9 +165,9 @@ def get_sign_meta(sign_name):
         "title": upper,
         "category": "CUSTOM SIGN PRACTICE",
         "steps": [
-            f"1. Demonstrate the gesture for {upper}.",
-            "2. Ensure your hands are within the camera frame.",
-            "3. Hold the position steady for 1 second."
+            f"1. Demonstrate sign for {upper}",
+            "2. Keep hands in camera view",
+            "3. Hold steady for 1 second"
         ],
         "target_region": None,
         "target_landmark_id": None,
@@ -145,11 +182,12 @@ def draw_spatial_target_overlay(frame, detection, current_target):
     """
     Draws a glowing visual target ring on the user's face (Forehead or Chin)
     and tracks the distance to their thumb in real-time.
+    (Keeps face natural and clean — NO mesh mask!)
     """
     meta = get_sign_meta(current_target)
     target_lid = meta.get("target_landmark_id")
     if target_lid is None:
-        return None, None  # No facial target for this sign (e.g., NO)
+        return None, None
 
     h, w, _ = frame.shape
     face_lms = detection.get("face")
@@ -167,14 +205,14 @@ def draw_spatial_target_overlay(frame, detection, current_target):
     for side in ("Right", "Left"):
         hand_lms = hands.get(side)
         if hand_lms and len(hand_lms) > 4:
-            hx = int(hand_lms[4][0] * w)  # thumb tip
+            hx = int(hand_lms[4][0] * w)
             hy = int(hand_lms[4][1] * h)
             dist = math.hypot(hx - tx, hy - ty)
             if dist < min_dist:
                 min_dist = dist
                 thumb_pt = (hx, hy)
 
-    # In-position threshold (in pixels on webcam)
+    # In-position threshold (within 65px radius)
     is_in_position = (thumb_pt is not None and min_dist < 65)
 
     # Pulsing ring animation
@@ -185,7 +223,7 @@ def draw_spatial_target_overlay(frame, detection, current_target):
         ring_col = (50, 255, 80)     # Neon Green (BGR)
         label_text = "IN POSITION! HOLD IT!"
     else:
-        ring_col = (0, 215, 255)     # Glowing Cyan/Yellow (BGR)
+        ring_col = (0, 215, 255)     # Glowing Amber/Yellow (BGR)
         label_text = meta["target_label"]
 
     # Draw target crosshair & circle
@@ -221,8 +259,8 @@ def draw_spatial_target_overlay(frame, detection, current_target):
 def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     """
     Builds the high-definition 1280x720 studio canvas.
-    - Left (800x720 area): Nicely scaled camera feed with rounded border and target cues.
-    - Right (480x720 area): Tutor Coach instructions, guidance box, meters, and scores.
+    - Left: Clean, unmasked camera feed with target crosshair.
+    - Right: Tutor Coach instructions, live visual demo image, and real-time guidance.
     """
     CANVAS_W, CANVAS_H = 1280, 720
     canvas_img = Image.new("RGB", (CANVAS_W, CANVAS_H), COLOR_BG_DARK)
@@ -287,44 +325,48 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     draw.text((dash_x + dash_w - 155, 32), mode_label, font=FONTS.small_font, fill=mode_color)
 
     # -----------------------------------------------------------------------
-    # Card 1: Current Lesson Card
+    # Card 1: Current Lesson Card with Visual Reference Demo Photo
     # -----------------------------------------------------------------------
     card1_y = 96
-    card1_h = 240
+    card1_h = 245
     draw.rounded_rectangle([dash_x, card1_y, dash_x + dash_w, card1_y + card1_h],
                            radius=12, fill=COLOR_CARD_BG, outline=COLOR_CARD_BORDER, width=1)
 
     meta = get_sign_meta(cur_target)
-    draw.text((dash_x + 20, card1_y + 16), meta["category"], font=FONTS.small_font, fill=COLOR_CYAN)
-    draw.text((dash_x + 20, card1_y + 36), meta["title"], font=FONTS.large_sign_font, fill=COLOR_TEXT_PRIMARY)
+    draw.text((dash_x + 18, card1_y + 14), meta["category"], font=FONTS.small_font, fill=COLOR_CYAN)
+    draw.text((dash_x + 18, card1_y + 32), meta["title"], font=FONTS.large_sign_font, fill=COLOR_TEXT_PRIMARY)
 
-    # Step-by-Step Instructions
-    step_y = card1_y + 88
+    # Step-by-Step Instructions (Left column inside Card 1)
+    step_y = card1_y + 80
     for step_text in meta["steps"]:
-        draw.text((dash_x + 20, step_y), step_text, font=FONTS.regular_font, fill=COLOR_TEXT_PRIMARY)
-        step_y += 32
+        draw.text((dash_x + 18, step_y), step_text, font=FONTS.small_font, fill=COLOR_TEXT_PRIMARY)
+        step_y += 28
 
-    # Challenge Timer Bar (Only in Tutor mode)
-    if is_tutor_mode:
-        elapsed = time.time() - state["step_start_time"]
-        remaining = max(0.0, state["time_limit"] - elapsed)
-        time_ratio = min(1.0, max(0.0, remaining / state["time_limit"]))
-        bar_col = COLOR_EMERALD if time_ratio > 0.3 else COLOR_CORAL
+    # Self-paced Badge (No timer pressure)
+    draw.rounded_rectangle([dash_x + 18, card1_y + card1_h - 42, dash_x + 235, card1_y + card1_h - 14],
+                           radius=6, fill=(24, 38, 30), outline=COLOR_EMERALD, width=1)
+    draw.text((dash_x + 28, card1_y + card1_h - 38), "Self-paced (No Timer)",
+              font=FONTS.small_font, fill=COLOR_EMERALD)
 
-        draw.text((dash_x + 20, card1_y + card1_h - 40),
-                  f"Challenge Timer: {remaining:.1f}s", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
+    # Demo Reference Photo (Right column inside Card 1)
+    demo_img = get_demo_image(cur_target, size=(142, 142))
+    img_x = dash_x + dash_w - 142 - 16
+    img_y = card1_y + 44
 
-        # Progress bar background & fill
-        bx = dash_x + 20
-        by = card1_y + card1_h - 20
-        bw = dash_w - 40
-        draw.rounded_rectangle([bx, by, bx + bw, by + 8], radius=4, fill=(40, 48, 60))
-        if time_ratio > 0:
-            draw.rounded_rectangle([bx, by, bx + int(bw * time_ratio), by + 8],
-                                   radius=4, fill=bar_col)
+    draw.text((img_x, card1_y + 20), "DEMO EXAMPLE:", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
+
+    if demo_img is not None:
+        canvas_img.paste(demo_img, (img_x, img_y), demo_img)
+        draw.rounded_rectangle([img_x - 1, img_y - 1, img_x + 143, img_y + 143],
+                               radius=10, outline=COLOR_CYAN, width=2)
+    else:
+        # Fallback card if image not found
+        draw.rounded_rectangle([img_x, img_y, img_x + 142, img_y + 142],
+                               radius=10, fill=(30, 36, 48), outline=COLOR_CARD_BORDER, width=1)
+        draw.text((img_x + 20, img_y + 60), "See Guide", font=FONTS.small_font, fill=COLOR_TEXT_MUTED)
 
     # -----------------------------------------------------------------------
-    # Card 2: Live AI Coach Guidance
+    # Card 2: Live AI Coach Guidance (Dynamic Real-time Advice)
     # -----------------------------------------------------------------------
     card2_y = card1_y + card1_h + 16
     card2_h = 135
@@ -336,12 +378,8 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
 
     if state.get("status") == "success":
         coach_badge = "EXCELLENT!"
-        coach_msg = "Gesture recognized successfully! +100 Points Awarded."
+        coach_msg = "Gesture recognized! Great job! +100 Points Awarded."
         coach_theme = COLOR_EMERALD
-    elif state.get("status") == "timeout":
-        coach_badge = "TIME'S UP"
-        coach_msg = "Don't worry! Try the next sign with steady motion."
-        coach_theme = COLOR_CORAL
     elif not has_face:
         coach_badge = "LOOKING FOR FACE"
         coach_msg = "Please position your face clearly in the camera view."
@@ -352,19 +390,19 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
         coach_theme = COLOR_AMBER
     elif in_pos:
         coach_badge = "GREAT POSITION"
-        coach_msg = "Hand is in the target zone! Hold still for recognition..."
+        coach_msg = "Hand is in target zone! Hold still for recognition..."
         coach_theme = COLOR_EMERALD
     elif meta.get("target_region") == "forehead":
         coach_badge = "ACTION REQUIRED"
-        coach_msg = "Touch your thumb tip to your FOREHEAD (yellow target circle)."
+        coach_msg = "Touch thumb tip to your FOREHEAD (see demo photo & target)."
         coach_theme = COLOR_CYAN
     elif meta.get("target_region") == "chin":
         coach_badge = "ACTION REQUIRED"
-        coach_msg = "Touch your thumb tip to your CHIN (yellow target circle)."
+        coach_msg = "Touch thumb tip to your CHIN (see demo photo & target)."
         coach_theme = COLOR_CYAN
     else:
         coach_badge = "ACTION REQUIRED"
-        coach_msg = "Perform the gesture clearly in front of the camera."
+        coach_msg = "Snap index and middle fingers firmly onto your thumb."
         coach_theme = COLOR_CYAN
 
     draw.rounded_rectangle([dash_x, card2_y, dash_x + dash_w, card2_y + card2_h],
@@ -413,7 +451,7 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
     draw.text((dash_x + stat_box_w + 28, card3_y + 36), f"{state['streak']}x Combo", font=FONTS.stat_font, fill=streak_col)
 
     # -----------------------------------------------------------------------
-    # 3. Floating Celebration / Timeout Banner across Camera
+    # 3. Floating Celebration Banner across Camera (On Success)
     # -----------------------------------------------------------------------
     if state.get("status") == "success":
         banner_w = cam_w - 80
@@ -428,20 +466,6 @@ def render_studio_frame(raw_cam_frame, detection, state, positive_signs):
                   font=FONTS.header_font, fill=(255, 255, 255))
         draw.text((bx1 + banner_w // 2 - 90, by1 + 54), "+100 Points Awarded",
                   font=FONTS.bold_font, fill=COLOR_EMERALD)
-
-    elif state.get("status") == "timeout":
-        banner_w = cam_w - 80
-        banner_h = 100
-        bx1 = cam_x + 40
-        by1 = cam_y + (cam_h - banner_h) // 2
-        bx2 = bx1 + banner_w
-        by2 = by1 + banner_h
-
-        draw.rounded_rectangle([bx1, by1, bx2, by2], radius=16, fill=(55, 22, 28), outline=COLOR_CORAL, width=3)
-        draw.text((bx1 + banner_w // 2 - 180, by1 + 18), "TIME'S UP! Keep Practicing!",
-                  font=FONTS.header_font, fill=(255, 255, 255))
-        draw.text((bx1 + banner_w // 2 - 120, by1 + 54), "Moving to next sign challenge...",
-                  font=FONTS.bold_font, fill=(255, 200, 200))
 
     # Convert back to BGR for OpenCV
     final_canvas_bgr = np.array(canvas_img)[:, :, ::-1]

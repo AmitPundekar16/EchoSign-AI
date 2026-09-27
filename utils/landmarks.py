@@ -141,8 +141,8 @@ class LandmarkDetector:
         self.face_landmarker.close()
 
 
-def draw_landmarks(frame_bgr, detection_result):
-    """Draws hand skeletons and the face mesh contour onto the frame in-place."""
+def draw_landmarks(frame_bgr, detection_result, draw_face=False):
+    """Draws hand skeletons cleanly. Face mesh is disabled by default to keep the face clear and unmasked."""
     for hand_landmarks in detection_result["hands_raw"]["landmarks"]:
         drawing_utils.draw_landmarks(
             frame_bgr,
@@ -152,22 +152,16 @@ def draw_landmarks(frame_bgr, detection_result):
             drawing_styles.get_default_hand_connections_style(),
         )
 
-    face_landmarks = detection_result["face_raw"]
-    if face_landmarks is not None:
-        drawing_utils.draw_landmarks(
-            frame_bgr,
-            face_landmarks,
-            FACE_TESSELATION,
-            landmark_drawing_spec=None,
-            connection_drawing_spec=drawing_styles.get_default_face_mesh_tesselation_style(),
-        )
-        drawing_utils.draw_landmarks(
-            frame_bgr,
-            face_landmarks,
-            FACE_CONTOURS,
-            landmark_drawing_spec=None,
-            connection_drawing_spec=drawing_styles.get_default_face_mesh_contours_style(),
-        )
+    if draw_face:
+        face_landmarks = detection_result["face_raw"]
+        if face_landmarks is not None:
+            drawing_utils.draw_landmarks(
+                frame_bgr,
+                face_landmarks,
+                FACE_CONTOURS,
+                landmark_drawing_spec=None,
+                connection_drawing_spec=drawing_styles.get_default_face_mesh_contours_style(),
+            )
 
 
 def hand_bounding_box(hand_points, image_w, image_h, margin=20):
