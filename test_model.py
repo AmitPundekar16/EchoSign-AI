@@ -41,11 +41,19 @@ class SignModel:
         self.run_config = run_config
         self.model_type = run_config["model_type"]
 
+        model_path = run_config.get("model_path", "")
+        if not os.path.isabs(model_path) or not os.path.exists(model_path):
+            fallback = config.MODEL_FILE_KERAS if self.model_type == "lstm" else config.MODEL_FILE_SKLEARN
+            if os.path.exists(fallback):
+                model_path = fallback
+            elif os.path.exists(os.path.join(config.PROJECT_ROOT, model_path)):
+                model_path = os.path.join(config.PROJECT_ROOT, model_path)
+
         if self.model_type == "lstm":
             from tensorflow import keras
-            self.model = keras.models.load_model(run_config["model_path"])
+            self.model = keras.models.load_model(model_path)
         else:
-            with open(run_config["model_path"], "rb") as f:
+            with open(model_path, "rb") as f:
                 self.model = pickle.load(f)
 
     def predict_proba(self, fixed_sequence):

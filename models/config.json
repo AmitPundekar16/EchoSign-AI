@@ -1,6 +1,6 @@
 {
   "model_type": "lstm",
-  "model_path": "c:\\Users\\arsal\\Downloads\\sign_language_ai\\sign_language_ai\\models\\sign_language_model.h5",
+  "model_path": "models/sign_language_model.h5",
   "sequence_len": 60,
   "feature_length": 220,
   "feature_names": [
