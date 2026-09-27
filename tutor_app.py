@@ -47,6 +47,7 @@ from utils.features import build_feature_vector, FEATURE_NAMES
 from utils.finger_geometry import classify_static_sign
 from utils.landmarks import LandmarkDetector, draw_landmarks, hand_bounding_box
 from utils.preprocessing import resample_sequence
+from utils.pretrained_recognizers import PretrainedGestureEngine
 from utils.ui_renderer import render_studio_frame
 
 
@@ -186,6 +187,8 @@ def main():
     cv2.resizeWindow(window_name, 1280, 720)
 
     detector = LandmarkDetector()
+    pretrained_engine = PretrainedGestureEngine()
+    start_app_time = time.time()
     image_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
     image_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
 
@@ -220,6 +223,7 @@ def main():
     print("  EchoSign AI - Interactive Sign Language Companion")
     print(f"  Curriculums: {', '.join(category_keys)}")
     print(f"  Current category [{current_category}]: {', '.join(active_signs)}")
+    print("  Models: Google Gesture Recognizer + ASL 26-Letter Neural Net")
     print("  Controls: [N] Next Sign  | [C] Switch Category | [D] Enlarge Demo")
     print("=" * 65 + "\n")
 
@@ -236,15 +240,19 @@ def main():
             is_static_target = cur_target in STATIC_SIGNS
 
             # -------------------------------------------------------------
-            # AI Inference Pipeline (Dual Engine)
+            # AI Inference Pipeline (Multi-Model Ensemble)
             # -------------------------------------------------------------
             pred_label = ""
             pred_conf = 0.0
 
             if is_static_target:
-                # 1. Instant Static Geometric Pose Evaluation (<1ms)
-                s_pred, s_conf, s_feed = classify_static_sign(detection, target_sign=cur_target)
-                state["feedback_msg"] = s_feed
+                # 1. Multi-Model Evaluation: Google Gesture Recognizer + ASL TFLite + Kinematics (<2ms)
+                timestamp_ms = int((now - start_app_time) * 1000)
+                eval_res = pretrained_engine.evaluate(frame, detection, timestamp_ms, target_sign=cur_target)
+                state["feedback_msg"] = eval_res["feedback"]
+
+                s_pred = eval_res["consensus_sign"]
+                s_conf = eval_res["consensus_conf"]
                 if s_pred:
                     pred_label = s_pred
                     pred_conf = s_conf
@@ -332,12 +340,13 @@ def main():
                         prediction_buffer.clear()
 
             elif state["mode"] == "free":
-                # Free Practice: Detect whatever static or dynamic sign is shown
-                s_pred, s_conf, _ = classify_static_sign(detection)
-                if s_pred and s_conf >= 0.75:
-                    state["last_pred_label"] = s_pred
-                    state["last_pred_conf"] = s_conf
-                    state["feedback_msg"] = f"Detected: {s_pred}"
+                # Free Practice: Multi-model detection across static alphabet and gestures
+                timestamp_ms = int((now - start_app_time) * 1000)
+                eval_res = pretrained_engine.evaluate(frame, detection, timestamp_ms, target_sign=None)
+                if eval_res["consensus_sign"] and eval_res["consensus_conf"] >= 0.70:
+                    state["last_pred_label"] = eval_res["consensus_sign"]
+                    state["last_pred_conf"] = eval_res["consensus_conf"]
+                    state["feedback_msg"] = f"Detected: {eval_res['consensus_sign']}"
 
             # Render landmarks on camera feed (Face mesh disabled, hand skeletons crisp)
             draw_landmarks(frame, detection)
@@ -393,6 +402,7 @@ def main():
     finally:
         cap.release()
         detector.close()
+        pretrained_engine.close()
         cv2.destroyAllWindows()
 
 
