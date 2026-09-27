@@ -32,6 +32,7 @@ from utils import config
 from utils.features import build_feature_vector, FEATURE_NAMES
 from utils.landmarks import LandmarkDetector, draw_landmarks, hand_bounding_box
 from utils.preprocessing import resample_sequence
+from utils.ui_renderer import render_studio_frame
 
 
 # ---------------------------------------------------------------------------
@@ -133,107 +134,6 @@ def extract_positive_signs(label_encoder, separator="::"):
     return list(dict.fromkeys(positive_signs))
 
 
-def draw_hud(frame, state):
-    """Draws a modern, polished tutor overlay on the video feed."""
-    h, w, _ = frame.shape
-    overlay = frame.copy()
-
-    # 1. Header Bar
-    cv2.rectangle(overlay, (0, 0), (w, 55), (20, 20, 25), -1)
-    cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
-
-    cv2.putText(frame, "EchoSign AI", (20, 36),
-                cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 215, 255), 2)
-    cv2.putText(frame, "| Interactive Tutor for Non-Verbal Learning", (195, 35),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 1)
-
-    # Mode indicator
-    mode_text = f"Mode: {state['mode'].upper()}"
-    cv2.putText(frame, mode_text, (w - 240, 35),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 2)
-
-    # 2. Score & Streak Box (Top Right)
-    score_overlay = frame.copy()
-    cv2.rectangle(score_overlay, (w - 230, 65), (w - 15, 135), (25, 25, 30), -1)
-    cv2.addWeighted(score_overlay, 0.8, frame, 0.2, 0, frame)
-    cv2.rectangle(frame, (w - 230, 65), (w - 15, 135), (80, 80, 90), 1)
-
-    cv2.putText(frame, f"SCORE: {state['score']}", (w - 215, 95),
-                cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 2)
-    streak_col = (0, 165, 255) if state['streak'] > 0 else (180, 180, 180)
-    cv2.putText(frame, f"STREAK: {state['streak']}x", (w - 215, 122),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, streak_col, 2)
-
-    # 3. Main Lesson Panel (Top Left)
-    if state['mode'] == "tutor":
-        panel_overlay = frame.copy()
-        cv2.rectangle(panel_overlay, (15, 65), (550, 195), (20, 25, 35), -1)
-        cv2.addWeighted(panel_overlay, 0.85, frame, 0.15, 0, frame)
-        cv2.rectangle(frame, (15, 65), (550, 195), (0, 180, 255), 2)
-
-        cur_sign = state['current_target']
-        info = LESSON_GUIDES.get(cur_sign, {
-            "title": cur_sign,
-            "guide": f"Demonstrate the sign for {cur_sign}.",
-            "tip": "Form the gesture clearly in front of the camera."
-        })
-
-        cv2.putText(frame, f"PRACTICE: {info['title']}", (28, 98),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.85, (0, 255, 255), 2)
-        cv2.putText(frame, f"Action: {info['guide'][:55]}", (28, 130),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (230, 230, 230), 1)
-        cv2.putText(frame, f"Tip: {info['tip'][:60]}", (28, 155),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (160, 220, 255), 1)
-
-        # Timer progress bar
-        elapsed = time.time() - state['step_start_time']
-        remaining = max(0.0, state['time_limit'] - elapsed)
-        ratio = remaining / state['time_limit']
-
-        bar_x, bar_y, bar_w, bar_h = 28, 175, 490, 8
-        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (60, 60, 60), -1)
-        fill_w = int(bar_w * ratio)
-        fill_col = (0, 255, 120) if ratio > 0.3 else (0, 80, 255)
-        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill_w, bar_y + bar_h), fill_col, -1)
-
-    # 4. Live Recognition Indicator (Bottom Left)
-    live_overlay = frame.copy()
-    cv2.rectangle(live_overlay, (15, h - 85), (380, h - 15), (20, 20, 25), -1)
-    cv2.addWeighted(live_overlay, 0.85, frame, 0.15, 0, frame)
-    cv2.rectangle(frame, (15, h - 85), (380, h - 15), (60, 60, 70), 1)
-
-    detected_text = f"DETECTED: {state['last_pred_label'] if state['last_pred_label'] else 'Detecting...'}"
-    conf_col = (0, 255, 120) if state['last_pred_label'] else (180, 180, 180)
-    cv2.putText(frame, detected_text, (25, h - 55),
-                cv2.FONT_HERSHEY_DUPLEX, 0.65, conf_col, 2)
-    conf_pct = f"CONFIDENCE: {state['last_pred_conf'] * 100:.1f}%" if state['last_pred_label'] else "CONFIDENCE: --"
-    cv2.putText(frame, conf_pct, (25, h - 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-
-    # 5. Celebration Banner on Success
-    if state['status'] == "success":
-        banner_overlay = frame.copy()
-        cy = h // 2
-        cv2.rectangle(banner_overlay, (0, cy - 60), (w, cy + 60), (0, 140, 30), -1)
-        cv2.addWeighted(banner_overlay, 0.85, frame, 0.15, 0, frame)
-        cv2.putText(frame, "CORRECT! EXCELLENT EXECUTION!", (w // 2 - 280, cy),
-                    cv2.FONT_HERSHEY_DUPLEX, 1.0, (255, 255, 255), 2)
-        cv2.putText(frame, "+100 Points Awarded", (w // 2 - 110, cy + 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 255, 200), 2)
-
-    # 6. Timeout Alert
-    elif state['status'] == "timeout":
-        banner_overlay = frame.copy()
-        cy = h // 2
-        cv2.rectangle(banner_overlay, (0, cy - 50), (w, cy + 50), (0, 60, 180), -1)
-        cv2.addWeighted(banner_overlay, 0.85, frame, 0.15, 0, frame)
-        cv2.putText(frame, "TIME'S UP! Keep Practicing!", (w // 2 - 220, cy + 5),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 255, 255), 2)
-
-    # 7. Navigation Controls (Bottom Right)
-    cv2.putText(frame, "[N] Next Sign  |  [M] Change Mode  |  [Q] Quit", (w - 420, h - 25),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (160, 160, 160), 1)
-
 
 def main():
     model, label_encoder, scaler, run_config = load_artifacts()
@@ -248,6 +148,10 @@ def main():
     if not cap.isOpened():
         print("Error: Could not open camera.")
         return
+
+    window_name = "EchoSign AI - Interactive Tutor"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name, 1280, 720)
 
     detector = LandmarkDetector()
     image_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
@@ -352,11 +256,13 @@ def main():
                         frame_buffer.clear()
                         prediction_buffer.clear()
 
-            # Render Landmarks & HUD
+            # Render landmarks on camera feed
             draw_landmarks(frame, detection)
-            draw_hud(frame, state)
 
-            cv2.imshow("EchoSign AI - Interactive Tutor", frame)
+            # Build full modern Studio Canvas
+            studio_canvas = render_studio_frame(frame, detection, state, positive_signs)
+
+            cv2.imshow(window_name, studio_canvas)
             key = cv2.waitKey(1) & 0xFF
 
             if key == ord('q'):
